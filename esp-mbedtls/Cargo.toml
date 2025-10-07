@@ -33,6 +33,8 @@ esp32c3 = ["esp-hal/esp32c3", "esp-wifi/esp32c3", "esp-mbedtls-sys/esp32c3"]
 esp32c6 = ["esp-hal/esp32c6", "esp-wifi/esp32c6", "esp-mbedtls-sys/esp32c6"]
 esp32s2 = ["esp-hal/esp32s2", "esp-wifi/esp32s2", "esp-mbedtls-sys/esp32s2"]
 esp32s3 = ["esp-hal/esp32s3", "esp-wifi/esp32s3", "esp-mbedtls-sys/esp32s3"]
+# allow custom time function
+platform-gmtime = []
 
 # Implement the traits defined in the latest HEAD of `edge-nal`
 edge-nal = ["dep:edge-nal", "async"]

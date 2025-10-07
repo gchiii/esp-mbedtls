@@ -3232,6 +3232,7 @@
  *
  * Module:  library/ssl_cookie.c
  * Caller:
+ *
  */
 #define MBEDTLS_SSL_COOKIE_C
 
@@ -3658,7 +3659,7 @@
 //#define MBEDTLS_PLATFORM_FREE_MACRO            free /**< Default free macro to use, can be undefined */
 //#define MBEDTLS_PLATFORM_EXIT_MACRO            exit /**< Default exit macro to use, can be undefined */
 //#define MBEDTLS_PLATFORM_SETBUF_MACRO      setbuf /**< Default setbuf macro to use, can be undefined */
-//#define MBEDTLS_PLATFORM_TIME_MACRO            time /**< Default time macro to use, can be undefined. MBEDTLS_HAVE_TIME must be enabled */
+//#define MBEDTLS_PLATFORM_TIME_MACRO                                             time /**< Default time macro to use, can be undefined. MBEDTLS_HAVE_TIME must be enabled */
 //#define MBEDTLS_PLATFORM_TIME_TYPE_MACRO       time_t /**< Default time macro to use, can be undefined. MBEDTLS_HAVE_TIME must be enabled */
 //#define MBEDTLS_PLATFORM_FPRINTF_MACRO      fprintf /**< Default fprintf macro to use, can be undefined */
 //#define MBEDTLS_PLATFORM_PRINTF_MACRO        printf /**< Default printf macro to use, can be undefined */
@@ -3906,7 +3907,10 @@
  * unconditionally use the implementation for mbedtls_platform_gmtime_r()
  * supplied at compile time.
  */
+// Add this to each config.h file
+#ifdef MBEDTLS_CONFIG_PLATFORM_GMTIME_ALT
 #define MBEDTLS_PLATFORM_GMTIME_R_ALT
+#endif
 
 /**
  * Enable the verified implementations of ECDH primitives from Project Everest

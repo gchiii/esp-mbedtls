@@ -36,3 +36,8 @@ esp32c3 = ["esp-wifi/esp32c3"]
 esp32c6 = ["esp-wifi/esp32c6"]
 esp32s2 = ["esp-wifi/esp32s2"]
 esp32s3 = ["esp-wifi/esp32s3"]
+
+platform-gmtime = []
+
+[package.metadata.docs.rs]
+features = ["platform-gmtime"]

@@ -15,6 +15,8 @@ pub struct MbedtlsBuilder {
     cmake_target: Option<String>,
     clang_target: Option<String>,
     host: Option<String>,
+    // Add this field for additional defines
+    additional_defines: Vec<(String, Option<String>)>,
 }
 
 impl MbedtlsBuilder {
@@ -46,95 +48,14 @@ impl MbedtlsBuilder {
             cmake_target,
             clang_target,
             host,
+            additional_defines: Vec::new(),
         }
     }
 
-    /// Generate bindings for esp-mbedtls-sys
-    ///
-    /// Arguments:
-    /// - `out_path`: Path to write the bindings to
-    pub fn generate_bindings(
-        &self,
-        out_path: &Path,
-        copy_file_path: Option<&Path>,
-    ) -> Result<PathBuf> {
-        if let Some(clang_path) = &self.clang_path {
-            std::env::set_var("CLANG_PATH", clang_path);
-        }
-
-        let canon = |path: &Path| {
-            // TODO: Is this really necessary?
-            path.display()
-                .to_string()
-                .replace('\\', "/")
-                .replace("//?/C:", "")
-        };
-
-        // Generate the bindings using `bindgen`:
-        log::info!("Generating bindings");
-        let mut builder = Builder::default().clang_args([
-            &format!(
-                "-I{}",
-                canon(&self.crate_root_path.join("mbedtls").join("include"))
-            ),
-            &format!(
-                "-I{}",
-                canon(
-                    &self
-                        .crate_root_path
-                        .join("gen")
-                        .join("include")
-                        .join("soc")
-                        .join(&self.soc_config)
-                )
-            ),
-        ]);
-
-        if let Some(sysroot_path) = &self.sysroot_path {
-            builder = builder.clang_args([
-                &format!("-I{}", canon(&sysroot_path.join("include"))),
-                &format!("--sysroot={}", canon(sysroot_path)),
-            ]);
-        }
-
-        if let Some(target) = &self.clang_target {
-            builder = builder.clang_arg(&format!("--target={target}"));
-        }
-
-        let bindings = builder
-            .ctypes_prefix("crate::c_types")
-            .derive_debug(false)
-            .header(
-                self.crate_root_path
-                    .join("gen")
-                    .join("include")
-                    .join("include.h")
-                    .to_string_lossy(),
-            )
-            .layout_tests(false)
-            .use_core()
-            .generate()
-            .map_err(|_| anyhow!("Failed to generate bindings"))?;
-
-        let bindings_file = out_path.join("bindings.rs");
-
-        // Write out the bindings to the appropriate path:
-        log::info!("Writing out bindings to: {}", bindings_file.display());
-        bindings.write_to_file(&bindings_file)?;
-
-        // Format the bindings:
-        Command::new("rustfmt")
-            .arg(bindings_file.to_string_lossy().to_string())
-            .arg("--config")
-            .arg("normalize_doc_attributes=true")
-            .output()?;
-
-        if let Some(copy_file_path) = copy_file_path {
-            log::info!("Copying bindings to {}", copy_file_path.display());
-            std::fs::copy(&bindings_file, copy_file_path)?;
-        }
-
-        Ok(bindings_file)
+    /// Add an additional define for compilation
+    pub fn with_define(mut self, name: &str, value: Option<&str>) -> Self {
+        self.additional_defines.push((name.to_string(), value.map(|s| s.to_string())));
+        self
     }
 
     /// Compile mbedtls
@@ -197,6 +118,14 @@ impl MbedtlsBuilder {
             .profile("Release")
             .out_dir(&target_dir);
 
+        // Add additional defines
+        for (name, value) in &self.additional_defines {
+            match value {
+                Some(val) => config.define(name, val),
+                None => config.define(name, ""),
+            };
+        }
+
         if let Some(target) = &self.cmake_target {
             config.target(target);
         }
@@ -219,6 +148,102 @@ impl MbedtlsBuilder {
         }
 
         Ok(lib_dir)
+    }
+
+    /// Generate bindings for esp-mbedtls-sys
+    ///
+    /// Arguments:
+    /// - `out_path`: Path to write the bindings to
+    pub fn generate_bindings(
+        &self,
+        out_path: &Path,
+        copy_file_path: Option<&Path>,
+    ) -> Result<PathBuf> {
+        if let Some(clang_path) = &self.clang_path {
+            std::env::set_var("CLANG_PATH", clang_path);
+        }
+
+        let canon = |path: &Path| {
+            // TODO: Is this really necessary?
+            path.display()
+                .to_string()
+                .replace('\\', "/")
+                .replace("//?/C:", "")
+        };
+
+        // Generate the bindings using `bindgen`:
+        log::info!("Generating bindings");
+        let mut builder = Builder::default().clang_args([
+            &format!(
+                "-I{}",
+                canon(&self.crate_root_path.join("mbedtls").join("include"))
+            ),
+            &format!(
+                "-I{}",
+                canon(
+                    &self
+                        .crate_root_path
+                        .join("gen")
+                        .join("include")
+                        .join("soc")
+                        .join(&self.soc_config)
+                )
+            ),
+        ]);
+
+        // Add additional defines to clang args for bindgen
+        for (name, value) in &self.additional_defines {
+            match value {
+                Some(val) => builder = builder.clang_arg(&format!("-D{}={}", name, val)),
+                None => builder = builder.clang_arg(&format!("-D{}", name)),
+            };
+        }
+
+        if let Some(sysroot_path) = &self.sysroot_path {
+            builder = builder.clang_args([
+                &format!("-I{}", canon(&sysroot_path.join("include"))),
+                &format!("--sysroot={}", canon(sysroot_path)),
+            ]);
+        }
+
+        if let Some(target) = &self.clang_target {
+            builder = builder.clang_arg(&format!("--target={target}"));
+        }
+
+        let bindings = builder
+            .ctypes_prefix("crate::c_types")
+            .derive_debug(false)
+            .header(
+                self.crate_root_path
+                    .join("gen")
+                    .join("include")
+                    .join("include.h")
+                    .to_string_lossy(),
+            )
+            .layout_tests(false)
+            .use_core()
+            .generate()
+            .map_err(|_| anyhow!("Failed to generate bindings"))?;
+
+        let bindings_file = out_path.join("bindings.rs");
+
+        // Write out the bindings to the appropriate path:
+        log::info!("Writing out bindings to: {}", bindings_file.display());
+        bindings.write_to_file(&bindings_file)?;
+
+        // Format the bindings:
+        Command::new("rustfmt")
+            .arg(bindings_file.to_string_lossy().to_string())
+            .arg("--config")
+            .arg("normalize_doc_attributes=true")
+            .output()?;
+
+        if let Some(copy_file_path) = copy_file_path {
+            log::info!("Copying bindings to {}", copy_file_path.display());
+            std::fs::copy(&bindings_file, copy_file_path)?;
+        }
+
+        Ok(bindings_file)
     }
 
     /// Re-run the build script if the file or directory has changed.

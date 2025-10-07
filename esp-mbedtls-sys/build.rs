@@ -11,6 +11,14 @@ fn main() -> Result<()> {
     builder::MbedtlsBuilder::track(&crate_root_path.join("gen"));
     builder::MbedtlsBuilder::track(&crate_root_path.join("mbedtls"));
 
+    // Check if platform-gmtime feature is enabled from parent crate
+    let platform_gmtime_enabled = env::var("CARGO_FEATURE_PLATFORM_GMTIME").is_ok() ||
+        env::var("DEP_ESP_MBEDTLS_PLATFORM_GMTIME").is_ok();
+
+    if platform_gmtime_enabled {
+        println!("cargo:rustc-cfg=mbedtls_platform_gmtime_alt");
+    }
+
     // If any one of these features is selected, we don't build anything
     // and just use the pre-generated baremetal ESP bindings and libraries
     let esp32 = env::var("CARGO_FEATURE_ESP32").is_ok();
@@ -59,7 +67,7 @@ fn main() -> Result<()> {
         // Need to do on-the-fly build and bindings' generation
         let out = PathBuf::from(env::var_os("OUT_DIR").unwrap());
 
-        let builder = builder::MbedtlsBuilder::new(
+        let mut builder = builder::MbedtlsBuilder::new(
             crate_root_path.clone(),
             "generic".to_string(),
             None,
@@ -68,6 +76,11 @@ fn main() -> Result<()> {
             Some(target),
             Some(host),
         );
+
+        // If platform-gmtime is enabled, add the define
+        if platform_gmtime_enabled {
+            builder = builder.with_define("MBEDTLS_PLATFORM_GMTIME_R_ALT", None);
+        }
 
         let libs_dir = builder.compile(&out, None)?;
         let bindings = builder.generate_bindings(&out, None)?;
@@ -85,6 +98,11 @@ fn main() -> Result<()> {
         println!("cargo:rustc-link-lib=static={}", "mbedx509");
         println!("cargo:rustc-link-lib=static={}", "mbedcrypto");
         println!("cargo:rustc-link-search={}", libs_dir.display());
+    }
+
+    // Propagate the feature to parent crate
+    if platform_gmtime_enabled {
+        println!("cargo:metadata=platform-gmtime=1");
     }
 
     Ok(())

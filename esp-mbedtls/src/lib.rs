@@ -1612,200 +1612,305 @@ unsafe extern "C" fn mbedtls_psa_external_get_random(
 }
 
 // ================================================================================================
-// MBEDTLS_PLATFORM_GMTIME_R_ALT Implementation
+// MBEDTLS_PLATFORM_GMTIME_R_ALT Implementation (Feature Gated)
 // ================================================================================================
 
-/// Standard C tm structure for time representation
-#[repr(C)]
-#[derive(Debug, Clone, Copy)]
-#[allow(non_camel_case_types)]
-pub struct tm {
-    pub tm_sec: c_int,   // seconds (0-60)
-    pub tm_min: c_int,   // minutes (0-59)
-    pub tm_hour: c_int,  // hours (0-23)
-    pub tm_mday: c_int,  // day of the month (1-31)
-    pub tm_mon: c_int,   // month (0-11)
-    pub tm_year: c_int,  // year - 1900
-    pub tm_wday: c_int,  // day of the week (0-6, Sunday = 0)
-    pub tm_yday: c_int,  // day in the year (0-365)
-    pub tm_isdst: c_int, // daylight saving time
-}
+#[cfg(feature = "platform-gmtime")]
+pub mod time {
+    use core::ffi::{c_int, c_long};
+    use critical_section::Mutex;
+    use core::cell::RefCell;
 
-/// Custom gmtime_r implementation when MBEDTLS_PLATFORM_GMTIME_R_ALT is enabled
-/// 
-/// This function converts time_t to a tm structure, similar to the standard gmtime_r function.
-/// It's designed for embedded systems where the standard library gmtime_r might not be available
-/// or thread-safe.
-///
-/// # Arguments
-/// * `tt` - Pointer to time_t value (seconds since Unix epoch)
-/// * `tm_buf` - Pointer to tm structure where result will be stored
-///
-/// # Returns
-/// * Pointer to the filled tm structure on success, null on failure
-#[no_mangle]
-unsafe extern "C" fn mbedtls_platform_gmtime_r(
-    tt: *const c_long,  // mbedtls_time_t is typically defined as time_t, which is c_long
-    tm_buf: *mut tm,
-) -> *mut tm {
-    if tt.is_null() || tm_buf.is_null() {
-        return core::ptr::null_mut();
+    /// Standard C tm structure for time representation
+    #[repr(C)]
+    #[derive(Debug, Clone, Copy)]
+    #[allow(non_camel_case_types)]
+    pub struct tm {
+        pub tm_sec: c_int,   // seconds (0-60)
+        pub tm_min: c_int,   // minutes (0-59)
+        pub tm_hour: c_int,  // hours (0-23)
+        pub tm_mday: c_int,  // day of the month (1-31)
+        pub tm_mon: c_int,   // month (0-11)
+        pub tm_year: c_int,  // year - 1900
+        pub tm_wday: c_int,  // day of the week (0-6, Sunday = 0)
+        pub tm_yday: c_int,  // day in the year (0-365)
+        pub tm_isdst: c_int, // daylight saving time
     }
 
-    let time_val = *tt;
-    
-    // For embedded systems, we implement a basic Unix epoch conversion
-    // This can be customized based on your platform's specific needs
-    
+    /// Trait for providing current time in seconds since Unix epoch
+    /// 
+    /// Users can implement this trait to provide their own time source,
+    /// such as RTC hardware, network time, or other time sources.
+    pub trait TimeProvider: Send + Sync {
+        /// Returns the current time as seconds since Unix epoch (January 1, 1970 00:00:00 UTC)
+        /// 
+        /// # Returns
+        /// * `Some(timestamp)` - Current time in seconds since Unix epoch
+        /// * `None` - Time is not available or invalid
+        fn now(&self) -> Option<u64>;
+    }
+
+    /// Default time provider that uses a fixed time
+    /// This is useful for testing or when accurate time is not critical
+    pub struct DefaultTimeProvider {
+        /// Fixed time to return (seconds since Unix epoch)
+        pub fixed_time: u64,
+    }
+
+    impl Default for DefaultTimeProvider {
+        fn default() -> Self {
+            Self {
+                // Default to January 1, 2024 00:00:00 UTC
+                fixed_time: 1704067200,
+            }
+        }
+    }
+
+    impl TimeProvider for DefaultTimeProvider {
+        fn now(&self) -> Option<u64> {
+            Some(self.fixed_time)
+        }
+    }
+
+    /// Example ESP32 RTC time provider
+    /// Users can implement similar providers for their specific hardware
     #[cfg(any(
         feature = "esp32",
-        feature = "esp32c3", 
+        feature = "esp32c3",
         feature = "esp32c6",
         feature = "esp32s2",
         feature = "esp32s3"
     ))]
-    {
-        esp_platform_gmtime_r_impl(time_val, tm_buf)
+    pub struct EspRtcTimeProvider {
+        // This is a placeholder - users would replace this with their actual RTC implementation
+        pub _phantom: core::marker::PhantomData<()>,
     }
-    
-    #[cfg(not(any(
+
+    #[cfg(any(
         feature = "esp32",
-        feature = "esp32c3", 
+        feature = "esp32c3",
         feature = "esp32c6",
         feature = "esp32s2",
         feature = "esp32s3"
-    )))]
-    {
-        generic_gmtime_r_impl(time_val, tm_buf)
+    ))]
+    impl EspRtcTimeProvider {
+        pub const fn new() -> Self {
+            Self {
+                _phantom: core::marker::PhantomData,
+            }
+        }
     }
-}
 
-/// ESP32-specific gmtime_r implementation
-/// You can customize this to integrate with ESP32's RTC or other time sources
-#[cfg(any(
-    feature = "esp32",
-    feature = "esp32c3", 
-    feature = "esp32c6",
-    feature = "esp32s2",
-    feature = "esp32s3"
-))]
-unsafe fn esp_platform_gmtime_r_impl(
-    time_val: c_long,
-    tm_buf: *mut tm,
-) -> *mut tm {
-    // For ESP32 platforms, you could integrate with hardware RTC here
-    // For now, we use the generic implementation
-    // Future enhancement: integrate with esp-hal time modules or ESP-IDF time functions
-    
-    generic_gmtime_r_impl(time_val, tm_buf)
-}
-
-/// Generic gmtime_r implementation for Unix epoch time conversion
-/// This implements a basic but correct time conversion algorithm
-unsafe fn generic_gmtime_r_impl(
-    time_val: c_long,
-    tm_buf: *mut tm,
-) -> *mut tm {
-    // Handle negative time values or very large values
-    if time_val < 0 {
-        return core::ptr::null_mut();
+    #[cfg(any(
+        feature = "esp32",
+        feature = "esp32c3",
+        feature = "esp32c6",
+        feature = "esp32s2",
+        feature = "esp32s3"
+    ))]
+    impl TimeProvider for EspRtcTimeProvider {
+        fn now(&self) -> Option<u64> {
+            // Placeholder implementation
+            // Users should replace this with actual RTC reading
+            // Examples:
+            // - For esp-hal: read from RTC peripheral
+            // - For esp-idf: use system time functions
+            // - For custom hardware: read from external RTC chip
+            None
+        }
     }
-    
-    let mut seconds = time_val as u64;
-    
-    // Start from Unix epoch: January 1, 1970
-    let mut year = 1970u32;
-    
-    // Calculate year
-    loop {
-        let year_seconds = if is_leap_year(year) { 366 * 24 * 3600 } else { 365 * 24 * 3600 };
-        if seconds >= year_seconds {
-            seconds -= year_seconds;
+
+    // Global time provider storage
+    static TIME_PROVIDER: Mutex<RefCell<Option<&'static dyn TimeProvider>>> = 
+        Mutex::new(RefCell::new(None));
+
+    /// Set a global time provider
+    /// 
+    /// This allows users to provide their own time implementation for use with TLS certificates
+    /// and other time-dependent cryptographic operations.
+    /// 
+    /// # Arguments
+    /// * `provider` - A reference to an object implementing the `TimeProvider` trait
+    /// 
+    /// # Safety
+    /// The provided time provider must have a 'static lifetime and remain valid
+    /// for the entire duration of the program.
+    /// 
+    /// # Example
+    /// ```rust
+    /// use esp_mbedtls::time::{TimeProvider, set_time_provider};
+    /// 
+    /// struct MyRtcProvider;
+    /// 
+    /// impl TimeProvider for MyRtcProvider {
+    ///     fn now(&self) -> Option<u64> {
+    ///         // Your RTC implementation here
+    ///         Some(get_rtc_time_seconds())
+    ///     }
+    /// }
+    /// 
+    /// static TIME_PROVIDER: MyRtcProvider = MyRtcProvider;
+    /// 
+    /// // Set the provider before using TLS
+    /// set_time_provider(&TIME_PROVIDER);
+    /// ```
+    pub fn set_time_provider(provider: &'static dyn TimeProvider) {
+        critical_section::with(|cs| {
+            *TIME_PROVIDER.borrow_ref_mut(cs) = Some(provider);
+        });
+    }
+
+    /// Get the current time provider
+    fn get_time_provider() -> Option<&'static dyn TimeProvider> {
+        critical_section::with(|cs| {
+            *TIME_PROVIDER.borrow_ref(cs)
+        })
+    }
+
+    /// Convert Unix timestamp to broken-down time
+    fn timestamp_to_tm(timestamp: u64) -> tm {
+        const SECONDS_PER_DAY: u64 = 86400;
+        const SECONDS_PER_HOUR: u64 = 3600;
+        const SECONDS_PER_MINUTE: u64 = 60;
+        
+        // Days since Unix epoch
+        let days = timestamp / SECONDS_PER_DAY;
+        let remaining_seconds = timestamp % SECONDS_PER_DAY;
+        
+        // Calculate time components
+        let hours = remaining_seconds / SECONDS_PER_HOUR;
+        let remaining_seconds = remaining_seconds % SECONDS_PER_HOUR;
+        let minutes = remaining_seconds / SECONDS_PER_MINUTE;
+        let seconds = remaining_seconds % SECONDS_PER_MINUTE;
+        
+        // Calculate date components
+        let mut year = 1970u32;
+        let mut days_remaining = days;
+        
+        // Find the year
+        loop {
+            let days_in_year = if is_leap_year(year) { 366 } else { 365 };
+            if days_remaining < days_in_year {
+                break;
+            }
+            days_remaining -= days_in_year;
             year += 1;
-        } else {
-            break;
+            
+            // Prevent infinite loops for very large time values
+            if year > 3000 {
+                break;
+            }
         }
         
-        // Prevent infinite loops for very large time values
-        if year > 3000 {
+        // Find the month and day
+        let days_in_months = if is_leap_year(year) {
+            [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+        } else {
+            [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+        };
+        
+        let mut month = 0;
+        let mut day = days_remaining + 1; // 1-based day
+        
+        for (i, &days_in_month) in days_in_months.iter().enumerate() {
+            if day <= days_in_month as u64 {
+                month = i;
+                break;
+            }
+            day -= days_in_month as u64;
+            month = i + 1;
+        }
+        
+        // Ensure month doesn't exceed bounds
+        if month >= 12 {
+            month = 11;
+            day = days_in_months[11] as u64;
+        }
+        
+        // Calculate day of week (0 = Sunday)
+        let day_of_week = ((days + 4) % 7) as c_int; // January 1, 1970 was a Thursday
+        
+        // Calculate day of year
+        let mut day_of_year = day - 1; // 0-based
+        for i in 0..month {
+            day_of_year += days_in_months[i] as u64;
+        }
+        
+        tm {
+            tm_sec: seconds as c_int,
+            tm_min: minutes as c_int,
+            tm_hour: hours as c_int,
+            tm_mday: day as c_int,
+            tm_mon: month as c_int,
+            tm_year: (year - 1900) as c_int,
+            tm_wday: day_of_week,
+            tm_yday: day_of_year as c_int,
+            tm_isdst: -1, // Unknown DST
+        }
+    }
+    
+    fn is_leap_year(year: u32) -> bool {
+        (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
+    }
+
+    /// Custom gmtime_r implementation when MBEDTLS_PLATFORM_GMTIME_R_ALT is enabled
+    /// 
+    /// This function converts time_t to a tm structure. If a custom time provider
+    /// is set via `set_time_provider`, it will use the current time from that provider
+    /// when the input timestamp is 0 or invalid. Otherwise, it uses the passed timestamp.
+    ///
+    /// # Arguments
+    /// * `tt` - Pointer to time_t value (seconds since Unix epoch)
+    /// * `tm_buf` - Pointer to tm structure where result will be stored
+    ///
+    /// # Returns
+    /// * Pointer to the filled tm structure on success, null on failure
+    ///
+    /// # Safety
+    /// This function is called by mbedtls C code and must handle null pointers safely.
+    #[no_mangle]
+    pub unsafe extern "C" fn mbedtls_platform_gmtime_r(
+        tt: *const c_long,
+        tm_buf: *mut tm,
+    ) -> *mut tm {
+        if tt.is_null() || tm_buf.is_null() {
             return core::ptr::null_mut();
         }
+
+        let fallback_timestamp = (*tt).max(0) as u64;
+        
+        // If timestamp is 0 or we have a time provider, try to get current time
+        let actual_timestamp = if *tt <= 0 {
+            get_time_provider()
+                .and_then(|provider| provider.now())
+                .unwrap_or(fallback_timestamp)
+        } else {
+            // Use provider if available, otherwise use passed timestamp
+            get_time_provider()
+                .and_then(|provider| provider.now())
+                .unwrap_or(fallback_timestamp)
+        };
+        
+        let tm_result = timestamp_to_tm(actual_timestamp);
+        *tm_buf = tm_result;
+        
+        tm_buf
     }
-    
-    // Calculate day of year
-    let day_of_year = (seconds / (24 * 3600)) as i32;
-    seconds %= 24 * 3600;
-    
-    // Calculate month and day
-    let days_in_month = if is_leap_year(year) {
-        [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-    } else {
-        [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-    };
-    
-    let mut month = 0;
-    let mut day = day_of_year + 1;
-    
-    for (i, &month_days) in days_in_month.iter().enumerate() {
-        if day <= month_days {
-            month = i;
-            break;
-        }
-        day -= month_days;
-    }
-    
-    // Calculate hour, minute, second
-    let hour = (seconds / 3600) as i32;
-    seconds %= 3600;
-    let min = (seconds / 60) as i32;
-    let sec = (seconds % 60) as i32;
-    
-    // Fill the tm structure
-    (*tm_buf).tm_sec = sec;
-    (*tm_buf).tm_min = min;
-    (*tm_buf).tm_hour = hour;
-    (*tm_buf).tm_mday = day;
-    (*tm_buf).tm_mon = month as i32;
-    (*tm_buf).tm_year = (year - 1900) as i32;
-    
-    // Calculate day of week (0 = Sunday)
-    let total_days = days_since_epoch(year, month, day);
-    (*tm_buf).tm_wday = ((total_days + 4) % 7) as i32; // Jan 1, 1970 was Thursday (4)
-    
-    (*tm_buf).tm_yday = day_of_year;
-    (*tm_buf).tm_isdst = -1; // Unknown daylight saving time
-    
-    tm_buf
 }
 
-/// Check if a year is a leap year
-#[inline]
-fn is_leap_year(year: u32) -> bool {
-    year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
-}
+#[cfg(feature = "platform-gmtime")]
+pub use time::{TimeProvider, set_time_provider, tm};
 
-/// Calculate the number of days since Unix epoch (Jan 1, 1970)
-fn days_since_epoch(year: u32, month: usize, day: i32) -> u64 {
-    let mut total_days = 0u64;
-    
-    // Add days for complete years
-    for y in 1970..year {
-        total_days += if is_leap_year(y) { 366 } else { 365 };
-    }
-    
-    // Add days for complete months in the current year
-    let days_in_month = if is_leap_year(year) {
-        [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-    } else {
-        [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-    };
-    
-    for i in 0..month {
-        total_days += days_in_month[i] as u64;
-    }
-    
-    // Add days in the current month (minus 1 since day is 1-indexed)
-    total_days += (day - 1) as u64;
-    
-    total_days
-}
+// Export ESP32 time provider when both features are enabled
+#[cfg(all(
+    feature = "platform-gmtime",
+    any(
+        feature = "esp32",
+        feature = "esp32c3",
+        feature = "esp32c6",
+        feature = "esp32s2",
+        feature = "esp32s3"
+    )
+))]
+pub use time::EspRtcTimeProvider;
+
