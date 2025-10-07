@@ -3907,7 +3907,7 @@
  * unconditionally use the implementation for mbedtls_platform_gmtime_r()
  * supplied at compile time.
  */
-//#define MBEDTLS_PLATFORM_GMTIME_R_ALT
+#define MBEDTLS_PLATFORM_GMTIME_R_ALT
 
 /**
  * Enable the verified implementations of ECDH primitives from Project Everest
