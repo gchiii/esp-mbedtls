@@ -1,7 +1,7 @@
 #![no_std]
 
 use core::cell::Cell;
-use core::ffi::{c_char, c_int, c_long, c_uchar, c_ulong, c_void, CStr};
+use core::ffi::{c_char, c_int, c_uchar, c_ulong, c_void, CStr};
 use core::fmt;
 use core::marker::PhantomData;
 use core::mem::size_of;
