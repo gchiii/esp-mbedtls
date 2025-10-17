@@ -12,7 +12,7 @@ use esp_println::{logger::init_logger, println};
 
 /// Only used for ROM functions
 #[allow(unused_imports)]
-use esp_wifi::init;
+use esp_radio::init;
 use hal::{clock::CpuClock, main, rng::Rng, timer::timg::TimerGroup};
 
 pub fn cycles() -> u64 {

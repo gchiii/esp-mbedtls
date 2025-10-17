@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 links = "mbedtls"
 license = "MIT OR Apache-2.0"
-rust-version = "1.84"
+rust-version = "1.88"
 
 [build-dependencies]
 anyhow      = "1.0.68"
@@ -19,7 +19,9 @@ embuild     = "0.33"
 # For malloc/free
 # TODO: Replace with `esp-alloc` once `esp-alloc` starts to provide `malloc` and `free` in future
 # ... or switch to our own `mbedtls_malloc/free`
-esp-wifi = { version = "0.15.0", default-features = false, optional = true }
+# esp-wifi = { version = "0.15.0", default-features = false, optional = true }
+esp-radio = { version = "0.16.0", default-features = false, optional = true }
+esp-alloc = { version = "0.9.0", default-features = false, features = ["compat"] }
 
 # ESP-IDF: The mbedtls lib distributed with ESP-IDF is used
 [target.'cfg(target_os = "espidf")'.dependencies]
@@ -31,11 +33,11 @@ esp-idf-sys = { version = "0.36", default-features = false }
 default = []
 
 # ESP-HAL: Exactly *one* chip MUST be selected via its feature:
-esp32 = ["esp-wifi/esp32"]
-esp32c3 = ["esp-wifi/esp32c3"]
-esp32c6 = ["esp-wifi/esp32c6"]
-esp32s2 = ["esp-wifi/esp32s2"]
-esp32s3 = ["esp-wifi/esp32s3"]
+esp32 = ["esp-alloc/esp32", "esp-radio/esp32"]
+esp32c3 = ["esp-alloc/esp32c3", "esp-radio/esp32c3"]
+esp32c6 = ["esp-alloc/esp32c6", "esp-radio/esp32c6"]
+esp32s2 = ["esp-alloc/esp32s2", "esp-radio/esp32s2"]
+esp32s3 = ["esp-alloc/esp32s3", "esp-radio/esp32s3"]
 
 platform-gmtime = []
 

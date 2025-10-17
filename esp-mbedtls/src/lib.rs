@@ -25,7 +25,7 @@ use esp_mbedtls_sys::bindings::*;
     feature = "esp32s2",
     feature = "esp32s3"
 ))]
-use esp_wifi as _;
+use esp_alloc as _;
 
 #[cfg(feature = "edge-nal")]
 mod edge_nal;
@@ -71,7 +71,13 @@ extern "C" {
 
     fn calloc(number: usize, size: usize) -> *const c_void;
 
-    fn random() -> c_ulong;
+    // fn random() -> c_ulong;
+}
+
+fn random() -> c_ulong {
+    let rng = ::esp_hal::rng::Rng::new();
+    rng.random()
+
 }
 
 macro_rules! error_checked {

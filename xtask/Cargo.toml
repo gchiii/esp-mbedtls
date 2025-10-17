@@ -5,9 +5,9 @@ edition = "2021"
 
 [dependencies]
 anyhow      = "1.0.68"
-bindgen     = "0.68.1"
-directories = "4.0.1"
-env_logger  = "0.10.0"
+bindgen     = "0.72.1"
+directories = "6.0.0"
+env_logger  = "0.11.8"
 log         = "0.4.17"
 cmake       = "0.1.52"
 tempdir     = "0.3.7"

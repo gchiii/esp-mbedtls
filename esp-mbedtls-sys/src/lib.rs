@@ -8,7 +8,7 @@
     feature = "esp32s2",
     feature = "esp32s3"
 ))]
-use esp_wifi as _;
+use esp_alloc as _;
 
 #[cfg(not(target_os = "espidf"))]
 mod c_types;

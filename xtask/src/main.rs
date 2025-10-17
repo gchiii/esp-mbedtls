@@ -69,7 +69,9 @@ enum Arch {
 
 impl Arch {
     pub const fn clang(&self) -> Option<&str> {
-        const ESP_XTENSA_CLANG_PATH: &str = "xtensa-esp32-elf-clang/esp-19.1.2_20250225/esp-clang/bin/clang";
+        // const ESP_XTENSA_CLANG_PATH: &str = "xtensa-esp32-elf-clang/esp-19.1.2_20250225/esp-clang/bin/clang";
+        // const ESP_XTENSA_CLANG_PATH: &str = "xtensa-esp32-elf-clang/esp-20.1.1_20250829/esp-clang/bin/clang";
+        const ESP_XTENSA_CLANG_PATH: &str = "xtensa-esp32-elf-clang/esp-16.0.4-20231113/esp-clang/bin/clang";
 
         match self {
             Arch::Xtensa => Some(ESP_XTENSA_CLANG_PATH),
