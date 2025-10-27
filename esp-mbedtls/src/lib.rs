@@ -1586,7 +1586,8 @@ unsafe extern "C" fn dbg_print(
 
 #[no_mangle]
 extern "C" fn rand() -> crate::c_ulong {
-    unsafe { crate::random() }
+    crate::random()
+    // unsafe { crate::random() }
 }
 
 unsafe extern "C" fn rng(_param: *mut c_void, buffer: *mut c_uchar, len: usize) -> c_int {
