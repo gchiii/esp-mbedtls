@@ -20,7 +20,7 @@ embuild     = "0.33"
 # TODO: Replace with `esp-alloc` once `esp-alloc` starts to provide `malloc` and `free` in future
 # ... or switch to our own `mbedtls_malloc/free`
 # esp-wifi = { version = "0.15.0", default-features = false, optional = true }
-esp-radio = { version = "0.16.0", default-features = false, optional = true }
+esp-radio = { version = "0.17.0", default-features = false, optional = true }
 esp-alloc = { version = "0.9.0", default-features = false, features = ["compat"] }
 
 # ESP-IDF: The mbedtls lib distributed with ESP-IDF is used
