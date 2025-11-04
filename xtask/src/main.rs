@@ -81,8 +81,8 @@ impl Arch {
     }
 
     pub const fn sysroot(&self) -> &str {
-        const ESP_XTENSA_SYSROOT_PATH: &str = "xtensa-esp-elf/esp-14.2.0_20240906/xtensa-esp-elf/xtensa-esp-elf";
-        const ESP_RISCV_SYSROOT_PATH: &str = "riscv32-esp-elf/esp-14.2.0_20240906/riscv32-esp-elf/riscv32-esp-elf";
+        const ESP_XTENSA_SYSROOT_PATH: &str = "xtensa-esp-elf/esp-15.2.0_20250920/xtensa-esp-elf/xtensa-esp-elf";
+        const ESP_RISCV_SYSROOT_PATH: &str = "riscv32-esp-elf/esp-15.2.0_20250920/riscv32-esp-elf/riscv32-esp-elf";
         
         match self {
             Arch::RiscV => ESP_RISCV_SYSROOT_PATH,

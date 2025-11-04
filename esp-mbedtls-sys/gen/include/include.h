@@ -1,5 +1,9 @@
 #define MBEDTLS_CONFIG_FILE "config.h"
 
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
+
 #include MBEDTLS_CONFIG_FILE
 
 #include "mbedtls/ssl.h"
